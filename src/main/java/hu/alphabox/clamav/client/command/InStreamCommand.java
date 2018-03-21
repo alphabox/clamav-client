@@ -13,6 +13,9 @@ public class InStreamCommand implements Command, SessionCommand {
 	private String message;
 
 	public InStreamCommand(String message) {
+		if ( message == null || message.isEmpty() ) {
+			throw new IllegalArgumentException("The message cannot be empty or null value.");
+		}
 		this.message = message;
 	}
 

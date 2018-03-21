@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import hu.alphabox.clamav.client.command.SessionCommand;
 
 public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient {
-	
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(ClamAVAsyncSessionClient.class);
 
 	private Map<Integer, CompletableFuture<String>> resultMap;
@@ -41,31 +41,45 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient {
 		new Thread(() -> {
 			StringBuilder builder = new StringBuilder();
 			InputStream inputStream = getInputStream();
+			
 			try {
-				while (!getSocket().isClosed()) {
-					int opByte = -1;
-					do {
-						opByte = inputStream.read();
+				int opByte = -1;
+				while ((opByte = inputStream.read()) != -1) {
+					if ( opByte != ClamAVSeparator.NULL.getSeparator()) {
 						builder.append((char) opByte);
-					} while (opByte != -1 && opByte != ClamAVSeparator.NULL.getSeparator());
-					int index = builder.toString().indexOf(':');
-					if (index != -1) {
-						CompletableFuture<String> result = resultMap
-								.remove(Integer.parseInt(builder.toString().substring(0, index)));
-						result.complete(builder.toString());
-						builder.setLength(0);
 					} else {
-						LOGGER.warn("Undefined response from ClamAV: {}", builder);
+						int index = builder.toString().indexOf(':');
+						if (index != -1) {
+							int resultIndex = Integer.parseInt(builder.toString().substring(0, index));
+							CompletableFuture<String> result = resultMap.remove(resultIndex);
+							result.complete(builder.toString());
+							builder.setLength(0);						
+						} else {
+							LOGGER.warn("Undefined response from ClamAV: {}", builder.toString().getBytes());
+						}
 					}
 				}
+				LOGGER.debug("The input reader closed silently.");
 			} catch (SocketException e) {
-				if( getSocket().isClosed()) {
+				if (getSocket().isClosed()) {
 					LOGGER.debug("Socket is closed for {}:{}", getSocket().getInetAddress(), getSocket().getPort());
+				} else {
+					LOGGER.warn(e.getMessage(), e);
 				}
 			} catch (IOException e) {
 				LOGGER.warn(e.getMessage(), e);
 			}
 		}).start();
+	}
+
+	@Override
+	public void close() throws Exception {
+		while (resultMap.size() != 0) {
+			Thread.sleep(100);
+		}
+		//TODO: Not working, as excepted
+		getSocket().shutdownInput();
+		super.close();
 	}
 
 }

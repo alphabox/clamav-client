@@ -9,13 +9,15 @@ import java.net.Socket;
 import hu.alphabox.clamav.client.command.SessionCommand;
 import hu.alphabox.clamav.client.command.SimpleCommand;
 
-public abstract class AbstractClamavSessionClient implements AutoCloseable {
+public abstract class AbstractClamavSessionClient<T> implements AutoCloseable {
 
 	private final Socket socket;
 
 	private final InputStream inputStream;
 
 	private final OutputStream outputStream;
+	
+	public abstract T sendCommand(SessionCommand command) throws IOException;
 
 	protected AbstractClamavSessionClient(InetAddress address, int port) throws IOException {
 		this.socket = new Socket(address, port);

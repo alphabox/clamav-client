@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import hu.alphabox.clamav.client.command.SessionCommand;
 
-public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient {
+public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future<String>> {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ClamAVAsyncSessionClient.class);
 
@@ -30,11 +30,16 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient {
 		startInputReader();
 	}
 
-	public synchronized Future<String> sendCommandWithResponse(SessionCommand command) throws IOException {
+	@Override
+	public synchronized Future<String> sendCommand(SessionCommand command) throws IOException {
 		CompletableFuture<String> result = new CompletableFuture<>();
 		resultMap.put(++counter, result);
 		sendCommandWithoutResponse(command);
 		return result;
+	}
+	
+	public int getCommandCounter() {
+		return counter;
 	}
 
 	private void startInputReader() {

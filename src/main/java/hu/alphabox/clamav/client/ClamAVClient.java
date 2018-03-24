@@ -18,12 +18,12 @@ public class ClamAVClient {
 		this.port = port;
 	}
 
-	public String sendCommand(Command command, ClamAVSeparator separator) throws IOException {
-		return sendMessage(command.getRequestByteArray(separator).toByteArray());
-	}
-
 	public String sendCommand(Command command) throws IOException {
 		return sendMessage(command.getRequestByteArray(ClamAVSeparator.NULL).toByteArray());
+	}
+	
+	public String sendCommand(Command command, ClamAVSeparator separator) throws IOException {
+		return sendMessage(command.getRequestByteArray(separator).toByteArray());
 	}
 
 	protected String sendMessage(byte[] message) throws IOException {
@@ -35,10 +35,9 @@ public class ClamAVClient {
 			outputStream.write(message);
 			outputStream.flush();
 
-			byte[] cache = new byte[1024];
-			int readBufferSize = 0;
-			while ((readBufferSize = inputStream.read(cache)) != -1) {
-				builder.append(new String(cache, 0, readBufferSize, "UTF-8"));
+			int opByte = -1;
+			while ((opByte = inputStream.read()) != -1) {
+				builder.append((char) opByte);
 			}
 		}
 

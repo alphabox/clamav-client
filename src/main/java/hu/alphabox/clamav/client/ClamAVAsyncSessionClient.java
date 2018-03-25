@@ -19,12 +19,16 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 	private static final Logger LOGGER = LoggerFactory.getLogger(ClamAVAsyncSessionClient.class);
 
 	private Map<Integer, CompletableFuture<String>> resultMap;
+	
+	private Thread thread;
 
+	private boolean isStop;
+	
 	private int counter;
 
 	public ClamAVAsyncSessionClient(String host, int port) throws IOException {
 		super(InetAddress.getByName(host), port);
-
+		this.isStop = false;
 		this.counter = 0;
 		this.resultMap = new HashMap<>();
 		startInputReader();
@@ -43,26 +47,35 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 	}
 
 	private void startInputReader() {
-		new Thread(() -> {
+		thread = new Thread(() -> {
 			StringBuilder builder = new StringBuilder();
 			InputStream inputStream = getInputStream();
 			
 			try {
 				int opByte = -1;
-				while ((opByte = inputStream.read()) != -1) {
-					if ( opByte != ClamAVSeparator.NULL.getSeparator()) {
-						builder.append((char) opByte);
-					} else {
-						int index = builder.toString().indexOf(':');
-						if (index != -1) {
-							int resultIndex = Integer.parseInt(builder.toString().substring(0, index));
-							CompletableFuture<String> result = resultMap.remove(resultIndex);
-							result.complete(builder.toString());
-							builder.setLength(0);						
-						} else {
-							LOGGER.warn("Undefined response from ClamAV: {}", builder.toString().getBytes());
+				int available = 0;
+				while(!isStop) {
+					if(( available = inputStream.available()) != 0) {
+						while (available-- != 0) {
+							opByte = inputStream.read();
+							if ( opByte != ClamAVSeparator.NULL.getSeparator()) {
+								builder.append((char) opByte);
+							} else if( opByte == -1 ) {
+								break;
+							} else {
+								int index = builder.indexOf(":");
+								if (index != -1) {
+									int resultIndex = Integer.parseInt(builder.substring(0, index));
+									CompletableFuture<String> result = resultMap.remove(resultIndex);
+									result.complete(builder.toString());
+									builder.setLength(0);						
+								} else {
+									LOGGER.warn("Undefined response from ClamAV: {}", builder.toString().getBytes());
+								}
+							}
 						}
 					}
+					Thread.sleep(10);
 				}
 				LOGGER.debug("The input reader closed silently.");
 			} catch (SocketException e) {
@@ -71,10 +84,11 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 				} else {
 					LOGGER.warn(e.getMessage(), e);
 				}
-			} catch (IOException e) {
+			} catch (IOException | InterruptedException e) {
 				LOGGER.warn(e.getMessage(), e);
 			}
-		}).start();
+		});
+		thread.start();
 	}
 
 	@Override
@@ -82,8 +96,8 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 		while (resultMap.size() != 0) {
 			Thread.sleep(100);
 		}
-		//TODO: Not working, as excepted
-		getSocket().shutdownInput();
+		isStop = true;
+		thread.join();
 		super.close();
 	}
 

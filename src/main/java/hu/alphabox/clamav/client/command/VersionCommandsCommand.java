@@ -2,7 +2,7 @@ package hu.alphabox.clamav.client.command;
 
 /**
  * Returns with program and database versions, followed by "| COMMANDS:"
- * and a space-delimited list of supported commands. Clamd < 0.95 will recognize
+ * and a space-delimited list of supported commands. Clamd &lt; 0.95 will recognize
  * this as the VERSION command, and reply only with their version, without the commands list.
  * 
  * @author Daniel Mecsei

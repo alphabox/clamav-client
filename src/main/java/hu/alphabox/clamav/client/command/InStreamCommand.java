@@ -6,10 +6,21 @@ import java.nio.ByteBuffer;
 
 import hu.alphabox.clamav.client.ClamAVSeparator;
 
-public class InStreamCommand implements Command, SessionCommand {
+/**
+ * The Clamd scan a stream of data. The stream is sent to clamd in one chunk,
+ * after INSTREAM, on the same socket on which the command was sent.
+ * This avoids the overhead of establishing new TCP connections and problems with NAT.
+ * 
+ * @author Daniel Mecsei
+ *
+ */
+public class InStreamCommand extends SimpleCommand implements SessionCommand {
 
 	private static final byte[] COMMAND = { 'I', 'N', 'S', 'T', 'R', 'E', 'A', 'M' };
 
+	/**
+	 * Store the message for ClamAV.
+	 */
 	private String message;
 
 	public InStreamCommand(String message) {
@@ -18,13 +29,15 @@ public class InStreamCommand implements Command, SessionCommand {
 		}
 		this.message = message;
 	}
+	
+	@Override
+	protected byte[] getCommand() {
+		return COMMAND;
+	}
 
 	@Override
 	public ByteArrayOutputStream getRequestByteArray(ClamAVSeparator separator) throws IOException {
-		ByteArrayOutputStream outputStream = new ByteArrayOutputStream(COMMAND.length + 2 + message.getBytes().length);
-		outputStream.write(separator.getPrefix());
-		outputStream.write(COMMAND);
-		outputStream.write(separator.getSeparator());
+		ByteArrayOutputStream outputStream = super.getRequestByteArray(separator);
 		outputStream.write(ByteBuffer.allocate(4).putInt(message.getBytes().length).array());
 		outputStream.write(message.getBytes());
 		outputStream.write(new byte[] { 0, 0, 0, 0 });

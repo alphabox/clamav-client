@@ -14,16 +14,41 @@ import org.slf4j.LoggerFactory;
 
 import hu.alphabox.clamav.client.command.SessionCommand;
 
+/**
+ * <p>
+ * It is an asyncron session client for ClamAV.
+ * You can send {@code SessionCommand} commands,and you
+ * will get the result as the ClamAV daemon responds with the right id.
+ * </p>
+ * <p>
+ * It is only use one connection for the whole session.
+ * </p>
+ * 
+ * @author Daniel Mecsei
+ *
+ */
 public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future<String>> {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ClamAVAsyncSessionClient.class);
 
+	/**
+	 * Store the waiting futures which wait for response.
+	 */
 	private Map<Integer, CompletableFuture<String>> resultMap;
 	
+	/**
+	 * Store the reading thread.
+	 */
 	private Thread thread;
 
+	/**
+	 * If it is true, than the reading thread will stop.
+	 */
 	private boolean isStop;
 	
+	/**
+	 * A counter which store the biggest id number.
+	 */
 	private int counter;
 
 	public ClamAVAsyncSessionClient(String host, int port) throws IOException {
@@ -42,10 +67,18 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 		return result;
 	}
 	
+	/**
+	 * Returns the last id.
+	 * @return the last id
+	 */
 	public int getCommandCounter() {
 		return counter;
 	}
 
+	/**
+	 * Create a new thread for {@code InputStream}, and it will run while we wait
+	 * for response or do not close the connection.
+	 */
 	private void startInputReader() {
 		thread = new Thread(() -> {
 			StringBuilder builder = new StringBuilder();
@@ -56,12 +89,9 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 				int available = 0;
 				while(!isStop) {
 					if(( available = inputStream.available()) != 0) {
-						while (available-- != 0) {
-							opByte = inputStream.read();
+						while (available-- != 0 && (opByte = inputStream.read()) != -1) {
 							if ( opByte != ClamAVSeparator.NULL.getSeparator()) {
 								builder.append((char) opByte);
-							} else if( opByte == -1 ) {
-								break;
 							} else {
 								int index = builder.indexOf(":");
 								if (index != -1) {
@@ -77,7 +107,7 @@ public class ClamAVAsyncSessionClient extends AbstractClamavSessionClient<Future
 					}
 					Thread.sleep(10);
 				}
-				LOGGER.debug("The input reader closed silently.");
+				LOGGER.debug("The input reader of {}:{} closed silently.", getSocket().getInetAddress(), getSocket().getPort());
 			} catch (SocketException e) {
 				if (getSocket().isClosed()) {
 					LOGGER.debug("Socket is closed for {}:{}", getSocket().getInetAddress(), getSocket().getPort());
